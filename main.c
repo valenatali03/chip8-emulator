@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define ROM_NAME "IBMLogo.ch8"
+#define ROM_NAME "3-corax+.ch8"
 
 typedef struct Memory
 {
@@ -91,8 +91,12 @@ int main(int argc, char *argv[])
 
     uint8_t display[64 * 32] = {0};
 
+    bool key_pressed;
+
     while (running)
     {
+        key_pressed = false;
+
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT)
@@ -106,6 +110,7 @@ int main(int argc, char *argv[])
                     if (event.key.keysym.sym == keyboard[i])
                     {
                         keys[i] = (event.type == SDL_KEYDOWN) ? 1 : 0;
+                        key_pressed = true;
                     }
                 }
             }
@@ -210,7 +215,13 @@ int main(int argc, char *argv[])
 
             case 0x7:
                 mem.V[0xF] = (mem.V[Y] >= mem.V[X]) ? 1 : 0;
-                mem.V[Y] -= mem.V[X];
+                mem.V[X] = mem.V[Y] - mem.V[X];
+                break;
+
+            case 0xE:
+                mem.V[X] = mem.V[Y];
+                mem.V[0xF] = mem.V[X] & 1;
+                mem.V[X] <<= 1;
                 break;
 
             default:
@@ -294,6 +305,54 @@ int main(int argc, char *argv[])
 
                 break;
 
+            default:
+                break;
+            }
+            break;
+
+        case 0xF:
+            switch (NN)
+            {
+
+            case 0x33:
+                mem.ram[mem.I] = ((mem.V[X] / 10) / 10) % 10;
+                mem.ram[mem.I + 1] = (mem.V[X] / 10) % 10;
+                mem.ram[mem.I + 2] = mem.V[X] % 10;
+                break;
+
+            case 0x55:
+                for (int i = 0; i <= X; i++)
+                {
+                    mem.ram[mem.I + i] = mem.V[i];
+                }
+                break;
+
+            case 0x65:
+                for (int i = 0; i <= X; i++)
+                {
+                    mem.V[i] = mem.ram[mem.I + i];
+                }
+
+                break;
+
+            case 0x1E:
+                mem.I += mem.V[X];
+                break;
+
+            case 0x0A:
+                if (key_pressed)
+                {
+                    for (int i = 0; i < 16; i++)
+                    {
+                        mem.V[X] = (keys[i] == 1) ? keys[i] : 0;
+                    }
+                }
+                else
+                {
+                    mem.pc -= 2;
+                }
+
+                break;
             default:
                 break;
             }

@@ -5,8 +5,6 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define ROM_NAME "3-corax+.ch8"
-
 typedef struct Memory
 {
     uint8_t ram[4096];
@@ -31,7 +29,7 @@ uint16_t fetch(Memory *mem);
 
 void decode(uint16_t instruction, uint8_t *opcode, uint8_t *X, uint8_t *Y, uint16_t *NNN, uint8_t *NN, uint8_t *N);
 
-void loadROM(Memory *mem);
+void loadROM(char *fname, Memory *mem);
 
 void push(Stack *stack, uint16_t elem);
 
@@ -73,7 +71,7 @@ int main(int argc, char *argv[])
     Memory mem = {0};
     mem.pc = 0x200;
 
-    loadROM(&mem);
+    loadROM(argv[1], &mem);
 
     uint16_t instruction;
 
@@ -390,9 +388,9 @@ void decode(uint16_t instruction, uint8_t *opcode, uint8_t *X, uint8_t *Y, uint1
     *N = instruction & 0x000F;
 }
 
-void loadROM(Memory *mem)
+void loadROM(char *fname, Memory *mem)
 {
-    FILE *rom = fopen(ROM_NAME, "rb");
+    FILE *rom = fopen(fname, "rb");
 
     if (!rom)
     {

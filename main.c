@@ -177,6 +177,7 @@ int main(int argc, char *argv[])
             break;
 
         case 0x8:
+            uint8_t aux;
             switch (N)
             {
             case 0x0:
@@ -196,30 +197,36 @@ int main(int argc, char *argv[])
                 break;
 
             case 0x4:
-                mem.V[0xF] = (mem.V[X] + mem.V[Y] > 0xFF) ? 1 : 0;
+                aux = mem.V[X];
                 mem.V[X] += mem.V[Y];
+                mem.V[0xF] = (aux + mem.V[Y] > 0xFF) ? 1 : 0;
                 break;
 
             case 0x5:
-                mem.V[0xF] = (mem.V[X] >= mem.V[Y]) ? 1 : 0;
+                aux = mem.V[X];
                 mem.V[X] -= mem.V[Y];
+                mem.V[0xF] = (aux >= mem.V[Y]) ? 1 : 0;
+
                 break;
 
             case 0x6:
                 mem.V[X] = mem.V[Y];
-                mem.V[0xF] = mem.V[X] & 1;
+                aux = mem.V[X];
                 mem.V[X] >>= 1;
+                mem.V[0xF] = aux & 1;
                 break;
 
             case 0x7:
-                mem.V[0xF] = (mem.V[Y] >= mem.V[X]) ? 1 : 0;
+                aux = mem.V[X];
                 mem.V[X] = mem.V[Y] - mem.V[X];
+                mem.V[0xF] = (mem.V[Y] >= aux) ? 1 : 0;
                 break;
 
             case 0xE:
                 mem.V[X] = mem.V[Y];
-                mem.V[0xF] = mem.V[X] & 1;
+                aux = mem.V[X];
                 mem.V[X] <<= 1;
+                mem.V[0xF] = (aux & 0x80) >> 7;
                 break;
 
             default:

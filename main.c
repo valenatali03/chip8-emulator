@@ -11,6 +11,8 @@ typedef struct Memory
     uint16_t pc;
     uint16_t I;
     uint8_t V[16];
+    uint8_t delay_timer;
+    uint8_t sound_timer;
 } Memory;
 
 typedef struct Stack
@@ -34,6 +36,10 @@ void loadROM(char *fname, Memory *mem);
 void push(Stack *stack, uint16_t elem);
 
 uint16_t pull(Stack *stack);
+
+bool waiting_for_key = false;
+int key_pressed = -1;
+uint8_t waiting_register;
 
 int main(int argc, char *argv[])
 {
@@ -70,6 +76,8 @@ int main(int argc, char *argv[])
 
     Memory mem = {0};
     mem.pc = 0x200;
+    mem.delay_timer = 0;
+    mem.sound_timer = 0;
 
     loadROM(argv[1], &mem);
 
@@ -89,11 +97,22 @@ int main(int argc, char *argv[])
 
     uint8_t display[64 * 32] = {0};
 
-    bool key_pressed;
+    clock_t timer_decremented;
+    clock_t begin;
 
     while (running)
     {
-        key_pressed = false;
+
+        begin = clock();
+
+        if ((double)(begin - timer_decremented) / CLOCKS_PER_SEC >= (double)1 / 60)
+        {
+            if (mem.delay_timer > 0)
+                mem.delay_timer--;
+            if (mem.sound_timer > 0)
+                mem.sound_timer--;
+            timer_decremented = clock();
+        }
 
         while (SDL_PollEvent(&event))
         {
@@ -108,7 +127,6 @@ int main(int argc, char *argv[])
                     if (event.key.keysym.sym == keyboard[i])
                     {
                         keys[i] = (event.type == SDL_KEYDOWN) ? 1 : 0;
-                        key_pressed = true;
                     }
                 }
             }
@@ -295,7 +313,7 @@ int main(int argc, char *argv[])
             switch (NN)
             {
             case 0x9E:
-                if (keys[mem.V[X]] == 1)
+                if (keys[mem.V[X]])
                 {
                     mem.pc += 2;
                 }
@@ -303,7 +321,7 @@ int main(int argc, char *argv[])
                 break;
 
             case 0xA1:
-                if (keys[mem.V[X]] == 0)
+                if (!keys[mem.V[X]])
                 {
                     mem.pc += 2;
                 }
@@ -318,6 +336,17 @@ int main(int argc, char *argv[])
         case 0xF:
             switch (NN)
             {
+            case 0x07:
+                mem.V[X] = mem.delay_timer;
+                break;
+
+            case 0x15:
+                mem.delay_timer = mem.V[X];
+                break;
+
+            case 0x18:
+                mem.sound_timer = mem.V[X];
+                break;
 
             case 0x33:
                 mem.ram[mem.I] = ((mem.V[X] / 10) / 10) % 10;
@@ -345,19 +374,36 @@ int main(int argc, char *argv[])
                 break;
 
             case 0x0A:
-                if (key_pressed)
+                if (!waiting_for_key)
                 {
-                    for (int i = 0; i < 16; i++)
-                    {
-                        mem.V[X] = (keys[i] == 1) ? keys[i] : 0;
-                    }
+                    waiting_for_key = true;
+                    waiting_register = X;
+                    key_pressed = -1;
+                    mem.pc -= 2;
                 }
                 else
                 {
-                    mem.pc -= 2;
-                }
+                    if (key_pressed >= 0 && !keys[key_pressed])
+                    {
+                        waiting_for_key = false;
+                    }
 
+                    for (int i = 0; i < 16; i++)
+                    {
+                        if (keys[i])
+                        {
+                            mem.V[waiting_register] = i;
+                            key_pressed = i;
+                        }
+                    }
+
+                    if (waiting_for_key)
+                    {
+                        mem.pc -= 2;
+                    }
+                }
                 break;
+
             default:
                 break;
             }

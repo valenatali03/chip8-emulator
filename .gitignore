@@ -1,3 +1,5 @@
 main
 .vscode
 .code-workspace
+*.o
+*.json

@@ -11,6 +11,11 @@ bool waiting_for_key = false;
 int key_pressed = -1;
 uint8_t waiting_register;
 
+const int CYCLES_PER_FRAME = 10;
+const int FRAME_DELAY_MS = 1000 / 60;
+
+void draw_screen(SDL_Renderer *renderer, uint8_t *display);
+
 int main(int argc, char *argv[])
 {
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
@@ -45,6 +50,11 @@ int main(int argc, char *argv[])
     SDL_Event event;
 
     Memory mem = {0};
+    for (int i = 0; i < 80; i++)
+    {
+        mem.ram[0x050 + i] = font_set[i];
+    }
+
     CPU cpu = {0};
     cpu.pc = 0x200;
     cpu.delay_timer = 0;
@@ -68,8 +78,30 @@ int main(int argc, char *argv[])
 
     uint8_t display[64 * 32] = {0};
 
+    uint32_t last_time = SDL_GetTicks();
+
     while (running)
     {
+        uint32_t current_time = SDL_GetTicks();
+        if (current_time - last_time >= FRAME_DELAY_MS)
+        {
+            last_time = current_time;
+
+            for (int i = 0; i < CYCLES_PER_FRAME; i++)
+            {
+                instruction = fetch(&mem, &cpu);
+                decode(instruction, &opcode, &X, &Y, &NNN, &NN, &N);
+                execute(opcode, X, Y, NNN, NN, N, &cpu, &mem, stack, keys, display, renderer,
+                        &waiting_for_key, &key_pressed, &waiting_register);
+            }
+
+            update_timers(&cpu);
+            if (draw_flag)
+            {
+                draw_screen(renderer, display);
+                draw_flag = false;
+            }
+        }
 
         update_timers(&cpu);
 
@@ -90,14 +122,6 @@ int main(int argc, char *argv[])
                 }
             }
         }
-
-        instruction = fetch(&mem, &cpu);
-        decode(instruction, &opcode, &X, &Y, &NNN, &NN, &N);
-        execute(opcode, X, Y, NNN, NN, N, &cpu, &mem, stack, keys, display, renderer,
-                waiting_for_key, key_pressed, waiting_register);
-
-        SDL_Delay(2);
-        SDL_RenderPresent(renderer);
     }
 
     SDL_DestroyRenderer(renderer);
@@ -105,4 +129,24 @@ int main(int argc, char *argv[])
     SDL_Quit();
 
     return 0;
+}
+
+void draw_screen(SDL_Renderer *renderer, uint8_t *display)
+{
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    int scale = 10;
+    for (int py = 0; py < 32; py++)
+    {
+        for (int px = 0; px < 64; px++)
+        {
+            if (display[py * 64 + px])
+            {
+                SDL_Rect r = {px * scale, py * scale, scale, scale};
+                SDL_RenderFillRect(renderer, &r);
+            }
+        }
+    }
+    SDL_RenderPresent(renderer);
 }

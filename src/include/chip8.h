@@ -26,6 +26,8 @@ typedef struct Stack
     uint16_t s[1024];
 } Stack;
 
+extern const uint8_t font_set[80];
+
 extern const SDL_Keycode keyboard[16];
 
 void load_rom(char *fname, Memory *mem);

@@ -1,6 +1,8 @@
 #include <stdbool.h>
 #include "include/instruction.h"
 
+bool draw_flag = false;
+
 uint16_t fetch(Memory *mem, CPU *cpu)
 {
     uint16_t instruction = (mem->ram[cpu->pc] << 8) | (mem->ram[cpu->pc + 1]);
@@ -20,7 +22,7 @@ void decode(uint16_t instruction, uint8_t *opcode, uint8_t *X, uint8_t *Y, uint1
 
 void execute(uint8_t opcode, uint8_t X, uint8_t Y, uint16_t NNN, uint8_t NN, uint8_t N,
              CPU *cpu, Memory *mem, Stack *stack, uint8_t *keys, uint8_t *display, SDL_Renderer *renderer,
-             bool waiting_for_key, int key_pressed, uint8_t waiting_register)
+             bool *waiting_for_key, int *key_pressed, uint8_t *waiting_register)
 {
     switch (opcode)
     {
@@ -171,7 +173,9 @@ void execute(uint8_t opcode, uint8_t X, uint8_t Y, uint16_t NNN, uint8_t NN, uin
             for (int col = 0; col < 8; col++)
             {
                 uint8_t pixel = (sprite_data >> (7 - col)) & 1;
-                int index = (y + row) * 64 + (x + col);
+                int px = (x + col) % 64;
+                int py = (y + row) % 32;
+                int index = py * 64 + px;
 
                 if (pixel == 1)
                 {
@@ -182,6 +186,7 @@ void execute(uint8_t opcode, uint8_t X, uint8_t Y, uint16_t NNN, uint8_t NN, uin
                     display[index] ^= 1;
                 }
             }
+            draw_flag = true;
         }
 
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
@@ -235,6 +240,10 @@ void execute(uint8_t opcode, uint8_t X, uint8_t Y, uint16_t NNN, uint8_t NN, uin
             cpu->sound_timer = cpu->V[X];
             break;
 
+        case 0x29:
+            cpu->I = 0x050 + (cpu->V[X] * 5);
+            break;
+
         case 0x33:
             mem->ram[cpu->I] = ((cpu->V[X] / 10) / 10) % 10;
             mem->ram[cpu->I + 1] = (cpu->V[X] / 10) % 10;
@@ -256,39 +265,39 @@ void execute(uint8_t opcode, uint8_t X, uint8_t Y, uint16_t NNN, uint8_t NN, uin
 
             break;
 
-        case 0x1E:
-            cpu->I += cpu->V[X];
-            break;
-
         case 0x0A:
-            if (!waiting_for_key)
+            if (!*waiting_for_key)
             {
-                waiting_for_key = true;
-                waiting_register = X;
-                key_pressed = -1;
+                *waiting_for_key = true;
+                *waiting_register = X;
+                *key_pressed = -1;
                 cpu->pc -= 2;
             }
             else
             {
-                if (key_pressed >= 0 && !keys[key_pressed])
+                if (*key_pressed >= 0 && !keys[*key_pressed])
                 {
-                    waiting_for_key = false;
+                    *waiting_for_key = false;
                 }
 
                 for (int i = 0; i < 16; i++)
                 {
                     if (keys[i])
                     {
-                        cpu->V[waiting_register] = i;
-                        key_pressed = i;
+                        cpu->V[*waiting_register] = i;
+                        *key_pressed = i;
                     }
                 }
 
-                if (waiting_for_key)
+                if (*waiting_for_key)
                 {
                     cpu->pc -= 2;
                 }
             }
+            break;
+
+        case 0x1E:
+            cpu->I += cpu->V[X];
             break;
 
         default:
